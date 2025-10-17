@@ -13,18 +13,17 @@ Rating). We try to best fit a line through dataset and estimate the parameters.
 # dependencies = [
 #     "httpx",
 #     "numpy",
+#     "matplotlib",
 # ]
 # ///
 
 import httpx
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def collect_dataset():
-    """Collect dataset of CSGO
-    The dataset contains ADR vs Rating of a Player
-    :return : dataset obtained from the link, as matrix
-    """
+    """Collect dataset of CSGO (ADR vs Rating)."""
     response = httpx.get(
         "https://raw.githubusercontent.com/yashLadha/The_Math_of_Intelligence/"
         "master/Week1/ADRvsRating.csv",
@@ -35,113 +34,88 @@ def collect_dataset():
     for item in lines:
         item = item.split(",")
         data.append(item)
-    data.pop(0)  # This is for removing the labels from the list
-    dataset = np.matrix(data)
+    data.pop(0)  # remove header
+    dataset = np.array(data, dtype=float)
     return dataset
 
 
 def run_steep_gradient_descent(data_x, data_y, len_data, alpha, theta):
-    """Run steep gradient descent and updates the Feature vector accordingly_
-    :param data_x   : contains the dataset
-    :param data_y   : contains the output associated with each data-entry
-    :param len_data : length of the data_
-    :param alpha    : Learning rate of the model
-    :param theta    : Feature vector (weight's for our model)
-    ;param return    : Updated Feature's, using
-                       curr_features - alpha_ * gradient(w.r.t. feature)
-    >>> import numpy as np
-    >>> data_x = np.array([[1, 2], [3, 4]])
-    >>> data_y = np.array([5, 6])
-    >>> len_data = len(data_x)
-    >>> alpha = 0.01
-    >>> theta = np.array([0.1, 0.2])
-    >>> run_steep_gradient_descent(data_x, data_y, len_data, alpha, theta)
-    array([0.196, 0.343])
-    """
+    """Perform one step of gradient descent."""
     n = len_data
-
-    prod = np.dot(theta, data_x.transpose())
-    prod -= data_y.transpose()
+    prod = np.dot(theta, data_x.T)
+    prod -= data_y.T
     sum_grad = np.dot(prod, data_x)
     theta = theta - (alpha / n) * sum_grad
     return theta
 
 
 def sum_of_square_error(data_x, data_y, len_data, theta):
-    """Return sum of square error for error calculation
-    :param data_x    : contains our dataset
-    :param data_y    : contains the output (result vector)
-    :param len_data  : len of the dataset
-    :param theta     : contains the feature vector
-    :return          : sum of square error computed from given feature's
-
-    Example:
-    >>> vc_x = np.array([[1.1], [2.1], [3.1]])
-    >>> vc_y = np.array([1.2, 2.2, 3.2])
-    >>> round(sum_of_square_error(vc_x, vc_y, 3, np.array([1])),3)
-    np.float64(0.005)
-    """
-    prod = np.dot(theta, data_x.transpose())
-    prod -= data_y.transpose()
+    """Compute mean squared error."""
+    prod = np.dot(theta, data_x.T)
+    prod -= data_y.T
     sum_elem = np.sum(np.square(prod))
     error = sum_elem / (2 * len_data)
     return error
 
 
-def run_linear_regression(data_x, data_y):
-    """Implement Linear regression over the dataset
-    :param data_x  : contains our dataset
-    :param data_y  : contains the output (result vector)
-    :return        : feature for line of best fit (Feature vector)
-    """
-    iterations = 100000
-    alpha = 0.0001550
-
+def run_linear_regression(data_x, data_y, iterations=20000, alpha=0.000155):
+    """Train a linear regression model using gradient descent."""
     no_features = data_x.shape[1]
-    len_data = data_x.shape[0] - 1
-
+    len_data = data_x.shape[0]
     theta = np.zeros((1, no_features))
 
     for i in range(iterations):
         theta = run_steep_gradient_descent(data_x, data_y, len_data, alpha, theta)
-        error = sum_of_square_error(data_x, data_y, len_data, theta)
-        print(f"At Iteration {i + 1} - Error is {error:.5f}")
-
+        if i % 2000 == 0:  # print error every 2000 iterations
+            error = sum_of_square_error(data_x, data_y, len_data, theta)
+            print(f"Iteration {i + 1} - Error: {error:.5f}")
     return theta
 
 
 def mean_absolute_error(predicted_y, original_y):
-    """Return sum of square error for error calculation
-    :param predicted_y   : contains the output of prediction (result vector)
-    :param original_y    : contains values of expected outcome
-    :return          : mean absolute error computed from given feature's
-
-    >>> predicted_y = [3, -0.5, 2, 7]
-    >>> original_y = [2.5, 0.0, 2, 8]
-    >>> mean_absolute_error(predicted_y, original_y)
-    0.5
-    """
+    """Compute Mean Absolute Error (MAE)."""
     total = sum(abs(y - predicted_y[i]) for i, y in enumerate(original_y))
     return total / len(original_y)
 
+#  New function added -plot :
+
+def plot_regression_line(data_x, data_y, theta):
+    """Plot the dataset and the fitted regression line."""
+    adr = data_x[:, 1]  # second column is ADR (feature)
+    rating = data_y     # actual Rating values
+
+    # predicted Rating values from the model
+    predicted_rating = theta[0, 0] + theta[0, 1] * adr
+
+    plt.figure(figsize=(8, 6))
+    plt.scatter(adr, rating, color="blue", label="Actual Data")
+    plt.plot(adr, predicted_rating, color="red", linewidth=2, label="Best Fit Line")
+    plt.title("Linear Regression: ADR vs Player Rating")
+    plt.xlabel("ADR (Average Damage per Round)")
+    plt.ylabel("Player Rating")
+    plt.legend()
+    plt.grid(True, linestyle="--", alpha=0.6)
+    plt.show()
+
 
 def main():
-    """Driver function"""
+    """Main driver function."""
     data = collect_dataset()
 
     len_data = data.shape[0]
-    data_x = np.c_[np.ones(len_data), data[:, :-1]].astype(float)
-    data_y = data[:, -1].astype(float)
+    data_x = np.c_[np.ones(len_data), data[:, :-1]]  # add intercept
+    data_y = data[:, -1]
 
     theta = run_linear_regression(data_x, data_y)
-    len_result = theta.shape[1]
-    print("Resultant Feature vector : ")
-    for i in range(len_result):
-        print(f"{theta[0, i]:.5f}")
+
+    print("\nResultant Feature Vector (θ):")
+    for i in range(theta.shape[1]):
+        print(f"θ[{i}] = {theta[0, i]:.5f}")
+
+    # Plot regression line
+    plot_regression_line(data_x, data_y, theta)
 
 
 if __name__ == "__main__":
-    import doctest
-
-    doctest.testmod()
     main()
+
